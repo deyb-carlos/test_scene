@@ -1,0 +1,134 @@
+@import url('https://fonts.googleapis.com/css2?family=Cal+Sans&family=Figtree:ital,wght@0,300..900;1,300..900&family=Public+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cal+Sans&family=Figtree:ital,wght@0,300..900;1,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Public+Sans:ital,wght@0,100..900;1,100..900&display=swap');
+@import "tailwindcss";
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --font-family: 'Figtree', Arial, sans-serif;
+  
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+.font-mont{
+  font-family: 'Montserrat', sans-serif;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-family);
+}
+
+/* Apply Cal Sans to all text elements */
+h1, h2, h3, h4, h5, h6,
+p, a, span, div,
+button, input, textarea,
+label, select, option {
+  font-family: var(--font-family);
+}
+
+.bg-image {
+  background-image: url('/images/storyboardbackground.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.9;
+}
+
+@keyframes implode {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0;
+  }
+}
+
+.implode-animation {
+  animation: implode 0.2s cubic-bezier(0.55, 0.085, 0.68, 0.53) forwards;
+  transform-origin: center;
+}
+
+.resolution-option {
+  transition: all 0.2s ease;
+}
+
+.resolution-option:hover {
+  transform: scale(1.05);
+}
+
+.resolution-option input:checked + div {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+/* Tooltip for better UX */
+.resolution-tooltip {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+
+.resolution-option:hover .resolution-tooltip {
+  opacity: 1;
+}
+
+.modal-enter {
+  opacity: 0;
+}
+.modal-enter-active {
+  opacity: 1;
+  transition: opacity 200ms;
+}
+.modal-exit {
+  opacity: 1;
+}
+.modal-exit-active {
+  opacity: 0;
+  transition: opacity 200ms;
+}
+
+/* Prevent scrolling when modal is open */
+body.modal-open {
+  overflow: hidden;
+}
+
+/* For custom scrollbar hiding */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+

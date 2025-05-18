@@ -1,0 +1,3 @@
+backend/env
+backend/api/safetensors/
+backend/api/.env
