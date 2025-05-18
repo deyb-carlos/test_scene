@@ -348,10 +348,10 @@ const Home = () => {
           </div>
 
           {/* Storyboard Thumbnails */}
-          {sortedStoryboards.map((storyboard) => (
+          {sortedStoryboards.map((storyboard, index) => (
             <div
               id={`storyboard-${storyboard.id}`}
-              key={storyboard.id}
+              key={`${storyboard.id ?? storyboard.name}-${index}`}
               className="flex flex-col group transition-all duration-200 origin-center"
             >
               <div
