@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
-from database import  Base
+from database import Base, engine
 from datetime import datetime, timezone
 
 
@@ -50,3 +50,4 @@ class PasswordResetToken(Base):
     created_at = Column(DateTime(timezone=True), default=datetime.now(timezone.utc))
 
 
+Base.metadata.create_all(bind=engine)
