@@ -10,30 +10,38 @@ from PIL import Image
 from io import BytesIO
 import models
 from database import SessionLocal
-from text_processor import get_resolved_sentences, detect_and_translate_to_english, get_script_captions
+from text_processor import (
+    get_resolved_sentences,
+    detect_and_translate_to_english,
+    get_script_captions,
+)
 from s3 import upload_image_to_s3
 from diffusers.utils import load_image
 import random
 from controlnet_aux import OpenposeDetector
 import numpy as np
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+device = torch.device("cpu")
+dtype = torch.float32  # CPU should use float32
 
+# Initialize VAE
 vae = AutoencoderKL.from_pretrained(
-    "madebyollin/sdxl-vae-fp16-fix", torch_dtype = dtype, use_safetensors=True
-).to(device)
+    "madebyollin/sdxl-vae-fp16-fix",
+    torch_dtype=dtype,
+    use_safetensors=True
+).to(device)  # Directly move to CPU
 
+# Initialize main pipeline with low_cpu_mem_usage=False to ensure full loading
 pipe = StableDiffusionXLPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0",
     vae=vae,
-    torch_dtype = dtype,
+    torch_dtype=dtype,
     variant="fp16",
     use_safetensors=True,
-)
+    low_cpu_mem_usage=False  # Disable memory optimization that uses meta tensors
+).to(device)
 
 pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config)
-pipe.enable_model_cpu_offload()
 
 # Load LoRA weights
 pipe.load_lora_weights(
@@ -44,23 +52,26 @@ pipe.set_adapters(["sketch", "angles"], adapter_weights=[0.5, 0.5])
 
 generator = torch.Generator(device)
 
+# Initialize Openpose
+openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet").to(device)
 
-openpose = OpenposeDetector.from_pretrained("lllyasviel/ControlNet")
-
+# Initialize T2IAdapter
 adapter = T2IAdapter.from_pretrained(
-    "TencentARC/t2i-adapter-openpose-sdxl-1.0", torch_dtype=dtype
-)
+    "TencentARC/t2i-adapter-openpose-sdxl-1.0",
+    torch_dtype=dtype
+).to(device)
 
+# Initialize pose pipeline
 posepipe = StableDiffusionXLAdapterPipeline.from_pretrained(
     "stabilityai/stable-diffusion-xl-base-1.0",
     adapter=adapter,
     vae=vae,
-    torch_dtype = dtype,
+    torch_dtype=dtype,
     variant="fp16",
     use_safetensors=True,
-)
+    low_cpu_mem_usage=False  # Disable memory optimization
+).to(device)
 
-posepipe.enable_model_cpu_offload()
 posepipe.scheduler = UniPCMultistepScheduler.from_config(posepipe.scheduler.config)
 
 posepipe.load_lora_weights(
@@ -68,7 +79,6 @@ posepipe.load_lora_weights(
 )
 posepipe.load_lora_weights("safetensors/anglesv2.safetensors", adapter_name="angles")
 posepipe.set_adapters(["sketch", "angles"], adapter_weights=[0.5, 0.5])
-
 
 def get_dimensions(resolution: str) -> tuple[int, int]:
     resolution_map = {
@@ -79,14 +89,16 @@ def get_dimensions(resolution: str) -> tuple[int, int]:
     return resolution_map.get(resolution, (1024, 1024))
 
 
-def generate_batch_images(story: str, storyboard_id: int, resolution: str = "1:1", isStory: bool = True):
+def generate_batch_images(
+    story: str, storyboard_id: int, resolution: str = "1:1", isStory: bool = True
+):
     db = SessionLocal()
     try:
         if isStory:
             prompts = get_resolved_sentences(story)
         elif not isStory:
             prompts = get_script_captions(story)
-            
+
         width, height = get_dimensions(resolution)
 
         for num, prompt in enumerate(prompts):
@@ -120,8 +132,6 @@ def generate_batch_images(story: str, storyboard_id: int, resolution: str = "1:1
                 db_image
             )  # Optional, in case you want to return/use it immediately
 
-
-            
     except Exception as e:
         print(f"Error during image generation: {e}")
         db.rollback()
@@ -150,7 +160,6 @@ def generate_single_image(
             raise ValueError(f"Image with id {image_id} not found.")
 
         if isOpenPose:
-
 
             image = openpose(pose_img, detect_resolution=512, image_resolution=1024)
             image = np.array(image)[:, :, ::-1]
