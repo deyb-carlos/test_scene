@@ -7,7 +7,7 @@ from fastapi import (
     Form,
     UploadFile,
     File,
-    APIRouter
+    APIRouter,
 )
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema
@@ -51,7 +51,7 @@ origins = [
     "http://35.213.136.241",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://sceneweaverproj.vercel.app/",
+    "https://scene-weaver.vercel.app",
 ]
 
 app.add_middleware(
@@ -713,13 +713,15 @@ async def generate_images(
 
     storyboard.updated_at = datetime.now(timezone.utc)
     db.commit()
-    
+
     if isStory:
         caption_length = get_resolved_sentences(story)
     else:
         caption_length = get_script_captions(story)
-        
-    background_tasks.add_task(generate_batch_images, story, storyboard.id, resolution, isStory)
+
+    background_tasks.add_task(
+        generate_batch_images, story, storyboard.id, resolution, isStory
+    )
 
     if storyboard.images:
         # Sort images by id in descending order (newest first)
