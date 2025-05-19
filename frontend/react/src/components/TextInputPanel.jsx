@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 const TextInputPanel = ({
   isCollapsed,
@@ -11,15 +11,53 @@ const TextInputPanel = ({
   onSubmit,
   isStory,
   setIsStory,
+  generationQueue,
 }) => {
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    if (!userInput.trim()) {
+      setNotificationMessage("No story or script provided");
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 2000);
+      return;
+    }
+
+    onSubmit(e);
+
+    // More accurate queue status check
+    const hasActiveOrQueuedItems = isGenerating || generationQueue.length > 0;
+
+    setNotificationMessage(
+      hasActiveOrQueuedItems ? "Added to queue" : "Generation started"
+    );
+
+    setShowNotification(true);
+    setTimeout(() => setShowNotification(false), 2000);
+  };
+
   return (
     <div
       className={`fixed md:relative bottom-0 left-0 right-0 md:left-auto md:right-auto ${
         isCollapsed
           ? "translate-y-full md:translate-y-0 md:w-0 md:opacity-0 md:overflow-hidden"
-          : "translate-y-0 w-full md:w-[30%]"
+          : "translate-y-0 w-full md:w-[30%] md:min-w-[300px]"
       } border-t md:border-r border-gray-200 p-4 flex flex-col transition-all duration-300 ease-in-out bg-white md:bg-transparent z-10 shadow-lg md:shadow-none`}
     >
+      {showNotification && (
+        <div
+          className="fixed left-1/2 transform -translate-x-1/2 bg-black text-white px-4 py-2 rounded-md text-sm z-[100] animate-fade"
+          style={{
+            top: window.innerWidth < 768 ? "6rem" : "60rem", // Increased from 4rem to 6rem for both mobile and desktop
+            bottom: "auto", // Remove bottom positioning to use top instead
+          }}
+        >
+          {notificationMessage}
+        </div>
+      )}
       {/* Desktop collapse button (hidden on mobile) */}
       <button
         onClick={onToggle}
@@ -42,7 +80,7 @@ const TextInputPanel = ({
         </svg>
       </button>
 
-      <form onSubmit={onSubmit} className="flex flex-col h-full">
+      <form onSubmit={handleSubmit} className="flex flex-col h-full">
         <textarea
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
@@ -137,20 +175,15 @@ const TextInputPanel = ({
             {/* Generate button (right) */}
             <button
               type="submit"
-              disabled={isGenerating}
-              className={`flex-grow px-4 py-2 rounded-lg transition-transform duration-200 ${
-                isGenerating
-                  ? "bg-gray-400 text-white cursor-not-allowed"
-                  : "bg-black text-white hover:bg-gray-500 hover:text-gray-700 hover:scale-[1.02] cursor-pointer"
-              }`}
+              className="flex-grow px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-500 hover:text-gray-700 hover:scale-[1.02] transition-transform duration-200 cursor-pointer"
             >
-              {isGenerating ? "Generating..." : "Generate"}
+              Generate
             </button>
           </div>
 
           {/* Desktop layout */}
-          <div className="hidden md:flex w-full justify-between items-center">
-            <div className="flex gap-3 items-center">
+          <div className="hidden md:flex w-full flex-wrap justify-between items-center gap-2">
+            <div className="flex flex-wrap gap-3 items-center">
               <ResolutionOption
                 value="1:1"
                 currentValue={resolution}
@@ -202,15 +235,15 @@ const TextInputPanel = ({
                   </svg>
                 }
               />
-              
+
               {/* Story/Script toggle buttons */}
-              <div className="flex ml-4 border border-gray-300 rounded-lg overflow-hidden">
+              <div className="flex border border-gray-300 rounded-lg overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setIsStory(true)}
                   className={`px-3 py-1 text-sm transition-colors ${
-                    isStory 
-                      ? "bg-black text-white" 
+                    isStory
+                      ? "bg-black text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
@@ -220,8 +253,8 @@ const TextInputPanel = ({
                   type="button"
                   onClick={() => setIsStory(false)}
                   className={`px-3 py-1 text-sm transition-colors ${
-                    !isStory 
-                      ? "bg-black text-white" 
+                    !isStory
+                      ? "bg-black text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}
                 >
@@ -232,14 +265,9 @@ const TextInputPanel = ({
 
             <button
               type="submit"
-              disabled={isGenerating}
-              className={`px-4 py-2 rounded-lg text-white transition-transform duration-200 ${
-                isGenerating
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-black hover:bg-gray-500 hover:text-gray-700 hover:scale-[1.02] cursor-pointer"
-              }`}
+              className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800 hover:scale-[1.02] transition-transform duration-200 cursor-pointer"
             >
-              {isGenerating ? "Generating..." : "Generate"}
+              Generate
             </button>
           </div>
         </div>

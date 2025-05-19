@@ -35,6 +35,10 @@ const Storyboard = () => {
   });
   const [showGenerationIndicator, setShowGenerationIndicator] = useState(false);
 
+  // Queue system
+  const [generationQueue, setGenerationQueue] = useState([]);
+  const [currentGeneration, setCurrentGeneration] = useState(null);
+
   const initialImageCountRef = useRef(0);
   const pollingIntervalRef = useRef(null);
 
@@ -83,6 +87,54 @@ const Storyboard = () => {
     if (id) fetchImages();
   }, [id]);
 
+  // Queue processing effect
+  useEffect(() => {
+    const processQueue = async () => {
+      // If currently processing or queue is empty, do nothing
+      if (currentGeneration || generationQueue.length === 0) return;
+
+      // Get the next item from the queue
+      const nextItem = generationQueue[0];
+
+      // Immediately update the queue state
+      setGenerationQueue((prev) => prev.slice(1));
+      setCurrentGeneration(nextItem);
+      setIsGenerating(true); // Ensure this is set before any async operations
+
+      try {
+        initialImageCountRef.current = storyboardImages.length;
+
+        setGenerationStatus({
+          isGenerating: true,
+          current: 0,
+          total: 0, // Will be updated from backend response
+          progress: 0,
+        });
+        setShowGenerationIndicator(true);
+
+        const formData = new FormData();
+        formData.append("story", nextItem.input);
+        formData.append("resolution", nextItem.resolution);
+        formData.append("isStory", nextItem.isStory);
+
+        const response = await imagesAPI.generateImages(id, formData);
+
+        // Update total from backend response
+        if (response.data?.count) {
+          setGenerationStatus((prev) => ({
+            ...prev,
+            total: response.data.count,
+          }));
+        }
+      } catch (error) {
+        console.error("Error generating images:", error);
+        completeGeneration(true);
+      }
+    };
+
+    processQueue();
+  }, [generationQueue, currentGeneration, id, storyboardImages.length]);
+
   useEffect(() => {
     const pollForImages = async () => {
       try {
@@ -119,7 +171,9 @@ const Storyboard = () => {
             generationStatus.total > 0 &&
             newImagesCount >= generationStatus.total
           ) {
-            completeGeneration();
+            if (newImagesCount >= generationStatus.total) {
+              completeGeneration(generationQueue.length === 0);
+            }
           }
         }
       } catch (err) {
@@ -146,56 +200,49 @@ const Storyboard = () => {
     };
   }, [generationStatus.isGenerating, id, generationStatus.total]);
 
-  const completeGeneration = () => {
+  const completeGeneration = (force = false) => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
 
-    setIsGenerating(false);
-    setShowGenerationIndicator(false);
-    setGenerationStatus({
-      isGenerating: false,
-      current: 0,
-      total: 0,
-      progress: 0,
+    setCurrentGeneration(null);
+
+    setGenerationQueue((currentQueue) => {
+      if (currentQueue.length === 0 || force) {
+        setIsGenerating(false);
+        setShowGenerationIndicator(false);
+        setGenerationStatus({
+          isGenerating: false,
+          current: 0,
+          total: 0,
+          progress: 0,
+        });
+      }
+      return currentQueue;
     });
+
     initialImageCountRef.current = storyboardImages.length;
   };
 
   const handleGenerateImages = async (e) => {
     e.preventDefault();
-    if (!userInput.trim() || isGenerating) return;
+    if (!userInput.trim()) return;
 
-    try {
-      initialImageCountRef.current = storyboardImages.length;
+    // Create generation item
+    const generationItem = {
+      input: userInput,
+      resolution: resolution,
+      isStory: isStory,
+    };
 
+    // If already generating, add to queue
+    if (isGenerating) {
+      setGenerationQueue([...generationQueue, generationItem]);
+    } else {
+      // Start generating immediately
       setIsGenerating(true);
-      setGenerationStatus({
-        isGenerating: true,
-        current: 0,
-        total: 0, // Will be updated from backend response
-        progress: 0,
-      });
-      setShowGenerationIndicator(true);
-
-      const formData = new FormData();
-      formData.append("story", userInput);
-      formData.append("resolution", resolution);
-      formData.append("isStory", isStory);
-
-      const response = await imagesAPI.generateImages(id, formData);
-
-      // Update total from backend response
-      if (response.data?.count) {
-        setGenerationStatus((prev) => ({
-          ...prev,
-          total: response.data.count,
-        }));
-      }
-    } catch (error) {
-      console.error("Error generating images:", error);
-      completeGeneration();
+      setGenerationQueue([generationItem]);
     }
   };
 
@@ -298,6 +345,7 @@ const Storyboard = () => {
           onToggle={toggleTextArea}
           userInput={userInput}
           setUserInput={setUserInput}
+          generationQueue={generationQueue}
           resolution={resolution}
           setResolution={setResolution}
           isGenerating={isGenerating}
@@ -388,17 +436,29 @@ const Storyboard = () => {
         />
       )}
       {showGenerationIndicator && (
-        <div className="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-xl border-2 border-black z-50 w-80">
-          <div className="flex items-center justify-between mb-2">
+        <div
+          className={`fixed ${
+            window.innerWidth < 768
+              ? "top-20 right-2 w-64 p-2"
+              : "bottom-4 right-4 w-80 p-4"
+          } bg-white rounded-lg shadow-xl border-2 border-black z-50`}
+        >
+          <div className="flex items-center justify-between mb-1">
             <div className="flex items-center">
-              <h3 className="font-medium text-gray-800">
+              <h3
+                className={`font-medium text-gray-800 ${
+                  window.innerWidth < 768 ? "text-sm" : ""
+                }`}
+              >
                 {generationStatus.total > 0
-                  ? `Generating ${generationStatus.current} of ${generationStatus.total}`
-                  : "Preparing generation..."}
+                  ? `Generating ${generationStatus.current}/${generationStatus.total}`
+                  : "Preparing..."}
               </h3>
               {generationStatus.total > 0 && (
                 <svg
-                  className="animate-spin ml-2 h-4 w-4 text-black"
+                  className={`animate-spin ml-2 ${
+                    window.innerWidth < 768 ? "h-3 w-3" : "h-4 w-4"
+                  } text-black`}
                   xmlns="http://www.w3.org/2000/svg"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -420,23 +480,45 @@ const Storyboard = () => {
               )}
             </div>
             {generationStatus.total > 0 && (
-              <span className="text-sm text-gray-500">
-                {generationStatus.progress}%
-              </span>
+              <div className="flex items-center">
+                <span
+                  className={`${
+                    window.innerWidth < 768 ? "text-xs" : "text-sm"
+                  } text-gray-500 mr-1`}
+                >
+                  {generationStatus.progress}%
+                </span>
+                {generationQueue.length > 0 && (
+                  <span className="text-xs text-gray-700 bg-gray-300 px-1.5 py-0.5 rounded">
+                    {generationQueue.length} in queue
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
           {generationStatus.total > 0 ? (
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              className={`w-full bg-gray-200 rounded-full ${
+                window.innerWidth < 768 ? "h-1.5" : "h-2.5"
+              }`}
+            >
               <div
-                className="bg-black h-2.5 rounded-full transition-all duration-300"
-                style={{ width: `${generationStatus.progress}%` }}
+                className="bg-black rounded-full transition-all duration-300"
+                style={{
+                  width: `${generationStatus.progress}%`,
+                  height: window.innerWidth < 768 ? "0.375rem" : "0.625rem",
+                }}
               ></div>
             </div>
           ) : (
-            <div className="flex items-center justify-center py-2">
+            <div className="flex items-center justify-center py-1">
               <svg
-                className="animate-spin -ml-1 mr-2 h-5 w-5 text-black"
+                className={`animate-spin ${
+                  window.innerWidth < 768
+                    ? "-ml-0.5 mr-1 h-3 w-3"
+                    : "-ml-1 mr-2 h-5 w-5"
+                } text-black`}
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24"
@@ -455,7 +537,13 @@ const Storyboard = () => {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              <span className="text-sm text-gray-600">Initializing...</span>
+              <span
+                className={`${
+                  window.innerWidth < 768 ? "text-xs" : "text-sm"
+                } text-gray-600`}
+              >
+                Initializing...
+              </span>
             </div>
           )}
         </div>
