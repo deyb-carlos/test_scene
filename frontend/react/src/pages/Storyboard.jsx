@@ -326,6 +326,7 @@ const Storyboard = () => {
 
   return (
     <div className="min-h-screen bg-white font-sans relative">
+      <title>Storyboard</title>
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
       <Header
