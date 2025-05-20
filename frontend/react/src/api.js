@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL + "/api", 
-  timeout: 50000,
+  timeout: 100000,
 });
 
 // Add request interceptor to inject token
